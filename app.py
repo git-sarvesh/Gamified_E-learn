@@ -2,45 +2,37 @@ import streamlit as st
 import time
 import requests
 
-# --- CONFIG ---
-LANGUAGES = [
-    "English", "Hindi", "Tamil", "Telugu", "Bengali", "Marathi", "Gujarati",
-    "Kannada", "Malayalam", "Punjabi", "Odia", "Assamese", "Urdu", "Sanskrit"
-]
-GAMES = [
-    "MCQ Quiz",
-    "Flashcards",
-    "Match The Following",
-    "Fill in the Blanks",
-    "True/False",
+# --- CONFIG: Place your Gemini API Key below ---
+GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"
+
+# Supported languages for Indian curriculum
+INDIAN_LANGUAGES = [
+    "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali",
+    "Marathi", "Urdu", "Gujarati", "Odia", "Punjabi", "Assamese", "Sanskrit"
 ]
 
-# --- SIDEBAR: Gemini API Key ---
-with st.sidebar:
-    st.markdown("🔑 **Gemini API Key Settings**")
-    GEMINI_API_KEY = st.text_input("AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34", type='password')
-    st.selectbox("🌐 Choose Language", LANGUAGES, key="chosen_lang")
-
-# --- NAVIGATION PAGES ---
-if 'page' not in st.session_state:
+# Navigation: Home, Pomodoro, Games
+if "page" not in st.session_state:
     st.session_state.page = "home"
+if "chosen_lang" not in st.session_state:
+    st.session_state.chosen_lang = "English"
 
-def nav(page):
+def go(page):
     st.session_state.page = page
 
-# --- HOME PAGE ---
+# ---- Home Page ----
 if st.session_state.page == "home":
-    st.title("🏠 XpArena Home")
-    st.image("https://static.wixstatic.com/media/88a138_9989fa6b9bde49e3b5a8a7b14541e335~mv2.png/v1/crop/x_0,y_0,w_1152,h_768/fill/w_560,h_373,al_c,q_85,usm_0.66_1.00_0.01/88a138_9989fa6b9bde49e3b5a8a7b14541e335~mv2.webp", width=220)
-    st.markdown("Welcome! Choose a module to get started:")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.button("⏳ Pomodoro Focus Timer", on_click=nav, args=("pomodoro",), use_container_width=True)
-    with col2:
-        st.button("🎮 Study Games", on_click=nav, args=("games",), use_container_width=True)
-    st.write("Change language anytime from sidebar.")
+    st.title("🎓 XpArena Home")
+    st.markdown("Welcome! Choose what you'd like to do:")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.button("⏳ Pomodoro Focus Timer", on_click=go, args=("pomodoro",))
+    with c2:
+        st.button("🎮 Games (CBSE & State-board)", on_click=go, args=("games",))
+    with c3:
+        st.button("🌐 Change Language", on_click=go, args=("lang",))
 
-# --- POMODORO TIMER PAGE ---
+# ---- Pomodoro Page ----
 if st.session_state.page == "pomodoro":
     st.header("⏳ Pomodoro Focus Timer")
     col1, col2, col3 = st.columns([1,1,1])
@@ -80,24 +72,20 @@ if st.session_state.page == "pomodoro":
         mins, secs = divmod(st.session_state.duration, 60)
         st.header(f"{mins:02d}:{secs:02d}")
 
-    st.button("🏠 Back to Home", on_click=nav, args=("home",), use_container_width=True)
-    st.info("Timer counts down as long as this session is active. For updates, rerun the app or take an action.")
+    st.button("🏠 Back to Home", on_click=go, args=("home",))
+    st.info("Timer counts down as long as this session is active.")
 
-# --- STUDY GAMES PAGE ---
+# ---- Games Page ----
 if st.session_state.page == "games":
-    st.title("🎮 Study Games & Practice")
-    st.markdown("Select a game type and subject to generate CBSE/State-board content using GeminiAI!")
-    game_type = st.selectbox("Choose a game", GAMES)
-    subject = st.selectbox("Choose Subject", [
-        "Mathematics", "Science", "Social Studies", "English",
-        "Hindi", "Computer Science", "Physics", "Chemistry", "Biology"
-    ])
+    st.header("🎮 CBSE & State-board Games")
+    game_type = st.selectbox("Choose Game Type", ["MCQ Quiz", "Flashcards", "True/False", "Fill in the Blanks"])
+    subject = st.selectbox("Choose Subject", ["Mathematics", "Science", "Social Studies", "English", "Hindi", "Computer Science"])
     language = st.session_state.chosen_lang
 
-    st.button("🏠 Back to Home", on_click=nav, args=("home",), use_container_width=True)
+    st.button("🏠 Back to Home", on_click=go, args=("home",))
 
     def get_gemini_questions(api_key, subject, language, game_type):
-        prompt = f"Generate {game_type} questions for {subject} based on the {language} CBSE/state board curriculum. Give results in simple text."
+        prompt = f"Generate {game_type}s for {subject} as per the {language} CBSE/state board curriculum."
         url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
         headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -106,22 +94,22 @@ if st.session_state.page == "games":
             r = requests.post(url, headers=headers, params=params, json=payload)
             r.raise_for_status()
             candidates = r.json().get("candidates", [])
-            if candidates:
-                text_block = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "No questions generated.")
-            else:
-                text_block = r.text
+            text_block = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "") if candidates else r.text
             return text_block
         except Exception as e:
             return f"❌ Error: {e}"
+    if st.button(f"Generate {game_type}"):
+        with st.spinner("Generating..."):
+            result = get_gemini_questions(GEMINI_API_KEY, subject, language, game_type)
+        st.code(result)
 
-    if st.button(f"Generate {game_type}", type="primary", use_container_width=True):
-        if not GEMINI_API_KEY:
-            st.error("Please enter your Gemini API key in the sidebar.")
-        else:
-            with st.spinner("Gemini AI is generating your game content..."):
-                results = get_gemini_questions(GEMINI_API_KEY, subject, language, game_type)
-            st.subheader(f"📝 {game_type} for {subject} ({language})")
-            st.code(results, language="markdown")
-            st.success("Here are your practice items!")
-
-# --- END ---
+# ---- Language Page ----
+if st.session_state.page == "lang":
+    st.header("🌐 Select Your Preferred Language")
+    lang_choice = st.selectbox(
+        "Languages:", INDIAN_LANGUAGES,
+        index=INDIAN_LANGUAGES.index(st.session_state.chosen_lang))
+    if st.button("Set Language"):
+        st.session_state.chosen_lang = lang_choice
+        st.success(f"Language set to {lang_choice}")
+    st.button("🏠 Back to Home", on_click=go, args=("home",))
