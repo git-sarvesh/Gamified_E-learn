@@ -84,8 +84,8 @@ if st.session_state.page == "games":
 
     def get_gemini_questions(api_key, subject, language, game_type):
         prompt = f"Generate {game_type}s for {subject} as per the {language} CBSE/state board curriculum."
-        # Use the correct endpoint! Try gemini-1.0-pro or gemini-1.5-pro-latest for latest
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent"
+        # Use the latest endpoint and model!
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
         headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         params = {"key": api_key}
