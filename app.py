@@ -3,15 +3,13 @@ import time
 import requests
 
 # --- CONFIG: Place your Gemini API Key below ---
-GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"
+GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"  # <--- Replace with your key
 
-# Supported languages for Indian curriculum
 INDIAN_LANGUAGES = [
     "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali",
     "Marathi", "Urdu", "Gujarati", "Odia", "Punjabi", "Assamese", "Sanskrit"
 ]
 
-# Navigation: Home, Pomodoro, Games
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "chosen_lang" not in st.session_state:
@@ -86,7 +84,8 @@ if st.session_state.page == "games":
 
     def get_gemini_questions(api_key, subject, language, game_type):
         prompt = f"Generate {game_type}s for {subject} as per the {language} CBSE/state board curriculum."
-        url = "https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent"
+        # Use the correct endpoint! Try gemini-1.0-pro or gemini-1.5-pro-latest for latest
+        url = "https://generativelanguage.googleapis.com/v1/models/gemini-1.0-pro:generateContent"
         headers = {"Content-Type": "application/json"}
         payload = {"contents": [{"parts": [{"text": prompt}]}]}
         params = {"key": api_key}
