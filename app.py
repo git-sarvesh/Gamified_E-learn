@@ -1,114 +1,105 @@
 import streamlit as st
 import time
 import requests
+import re
 
-# --- CONFIG: Place your Gemini API Key below ---
-GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"  # <--- Replace with your key
+GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"
 
-INDIAN_LANGUAGES = [
-    "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali",
-    "Marathi", "Urdu", "Gujarati", "Odia", "Punjabi", "Assamese", "Sanskrit"
-]
+def get_gemini_mcq(api_key, subject, language, num_questions=4):
+    prompt = (
+        f"Generate {num_questions} multiple-choice questions for {subject} "
+        f"as per the {language} CBSE/state board curriculum. "
+        "For each question, provide four options A, B, C, D, and the correct answer with a brief explanation. "
+        "Format very strictly as:\n"
+        "Q: [question text]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nAnswer: [A/B/C/D]\nExplanation: [explanation]\n"
+    )
+    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    headers = {"Content-Type": "application/json"}
+    payload = {"contents": [{"parts": [{"text": prompt}]}]}
+    params = {"key": api_key}
+    try:
+        r = requests.post(url, headers=headers, params=params, json=payload)
+        r.raise_for_status()
+        candidates = r.json().get("candidates", [])
+        text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "") if candidates else r.text
+        return text
+    except Exception as e:
+        return f"❌ Error: {e}"
 
-if "page" not in st.session_state:
-    st.session_state.page = "home"
-if "chosen_lang" not in st.session_state:
-    st.session_state.chosen_lang = "English"
+def parse_mcqs(text):
+    # Extract MCQs from Gemini result text
+    mcq_pattern = re.compile(
+        r"Q\d*[:.\s-]*(.*?)\nA\)[^\n]+\nB\)[^\n]+\nC\)[^\n]+\nD\)[^\n]+\nAnswer:[\s]*(.)\nExplanation:[\s]*(.*?)\n",
+        re.DOTALL
+    )
+    results = []
+    for match in mcq_pattern.finditer(text):
+        qtext = match.group(1).strip()
+        options = [re.search(f"{opt}\)([^\n]+)", match.group(0)).group(1).strip() for opt in "ABCD"]
+        answer = match.group(2).strip()
+        expl = match.group(3).strip()
+        results.append({"question": qtext, "options": options, "answer": answer, "explanation": expl})
+    # fallback: try to parse at least one question if format differs
+    if not results:
+        # fallback pattern: looks for loose Q/A without strict formatting
+        q_blocks = re.split(r"\nQ[\d]*[:.\s-]*", text)
+        for block in q_blocks[1:]:
+            try:
+                opts = re.findall(r"[A-D]\)[^\n]+", block)
+                if len(opts) != 4: continue
+                options = [o[2:].strip() for o in opts]
+                q_match = block.split('\nA)')[0].strip()
+                answer_match = re.search(r"Answer:[\s]*([A-D])", block)
+                expl_match = re.search(r"Explanation:[\s]*(.*?)\n", block)
+                answer = answer_match.group(1) if answer_match else ""
+                expl = expl_match.group(1) if expl_match else ""
+                if q_match: results.append({"question": q_match, "options": options, "answer": answer, "explanation": expl})
+            except Exception:
+                continue
+    return results
 
-def go(page):
-    st.session_state.page = page
+# --- UI Below ---
+st.title("📝 MCQ Quiz")
+subject = st.selectbox("Subject", ["Mathematics", "Science", "Social Studies", "English", "Hindi", "Computer Science"])
+language = st.selectbox("Language", ["English", "Hindi", "Tamil", "Telugu", "Malayalam"])
+num_questions = st.slider("Number of Questions", 1, 10, 4)
+generate = st.button("Generate Quiz")
 
-# ---- Home Page ----
-if st.session_state.page == "home":
-    st.title("🎓 XpArena Home")
-    st.markdown("Welcome! Choose what you'd like to do:")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.button("⏳ Pomodoro Focus Timer", on_click=go, args=("pomodoro",))
-    with c2:
-        st.button("🎮 Games (CBSE & State-board)", on_click=go, args=("games",))
-    with c3:
-        st.button("🌐 Change Language", on_click=go, args=("lang",))
+if generate or st.session_state.get("mcqs"):
 
-# ---- Pomodoro Page ----
-if st.session_state.page == "pomodoro":
-    st.header("⏳ Pomodoro Focus Timer")
-    col1, col2, col3 = st.columns([1,1,1])
-    if 'pomodoro_active' not in st.session_state:
-        st.session_state.pomodoro_active = False
-    if 'start_time' not in st.session_state:
-        st.session_state.start_time = None
-    if 'duration' not in st.session_state:
-        st.session_state.duration = 25 * 60
-
-    with col1:
-        if st.button("▶️ Start", key="start_tt"):
-            st.session_state.pomodoro_active = True
-            st.session_state.start_time = time.time()
-            st.session_state.duration = 25 * 60
-    with col2:
-        if st.button("⏸️ Pause", key="pause_tt"):
-            st.session_state.pomodoro_active = False
-    with col3:
-        if st.button("🔄 Reset", key="reset_tt"):
-            st.session_state.pomodoro_active = False
-            st.session_state.start_time = None
-            st.session_state.duration = 25 * 60
-
-    if st.session_state.start_time and st.session_state.pomodoro_active:
-        elapsed = int(time.time() - st.session_state.start_time)
-        remaining = st.session_state.duration - elapsed
-        if remaining <= 0:
-            st.session_state.pomodoro_active = False
-            st.balloons()
-            st.success("⏰ Time's up! Take a break. 🎉")
-            st.session_state.start_time = None
-            remaining = 0
-        mins, secs = divmod(remaining, 60)
-        st.header(f"{mins:02d}:{secs:02d}")
+    if generate:
+        with st.spinner("Getting questions from Gemini..."):
+            mcq_text = get_gemini_mcq(GEMINI_API_KEY, subject, language, num_questions)
+            mcqs = parse_mcqs(mcq_text)
+            st.session_state.mcqs = mcqs
+            st.session_state.submitted = False
     else:
-        mins, secs = divmod(st.session_state.duration, 60)
-        st.header(f"{mins:02d}:{secs:02d}")
+        mcqs = st.session_state.mcqs
 
-    st.button("🏠 Back to Home", on_click=go, args=("home",))
-    st.info("Timer counts down as long as this session is active.")
+    responses = []
+    quiz_form = st.form("quiz_form")
+    with quiz_form:
+        st.header("Choose your answers:")
+        for idx, q in enumerate(mcqs):
+            st.write(f"**Q{idx+1}: {q['question']}**")
+            responses.append(
+                st.radio(
+                    f"Choose for Q{idx+1}", q["options"], index=0, key=f"q{idx}"
+                )
+            )
+        submitted = st.form_submit_button("Submit Answers")
 
-# ---- Games Page ----
-if st.session_state.page == "games":
-    st.header("🎮 CBSE & State-board Games")
-    game_type = st.selectbox("Choose Game Type", ["MCQ Quiz", "Flashcards", "True/False", "Fill in the Blanks"])
-    subject = st.selectbox("Choose Subject", ["Mathematics", "Science", "Social Studies", "English", "Hindi", "Computer Science"])
-    language = st.session_state.chosen_lang
-
-    st.button("🏠 Back to Home", on_click=go, args=("home",))
-
-    def get_gemini_questions(api_key, subject, language, game_type):
-        prompt = f"Generate {game_type}s for {subject} as per the {language} CBSE/state board curriculum."
-        # Use the latest endpoint and model!
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
-        headers = {"Content-Type": "application/json"}
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
-        params = {"key": api_key}
-        try:
-            r = requests.post(url, headers=headers, params=params, json=payload)
-            r.raise_for_status()
-            candidates = r.json().get("candidates", [])
-            text_block = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "") if candidates else r.text
-            return text_block
-        except Exception as e:
-            return f"❌ Error: {e}"
-    if st.button(f"Generate {game_type}"):
-        with st.spinner("Generating..."):
-            result = get_gemini_questions(GEMINI_API_KEY, subject, language, game_type)
-        st.code(result)
-
-# ---- Language Page ----
-if st.session_state.page == "lang":
-    st.header("🌐 Select Your Preferred Language")
-    lang_choice = st.selectbox(
-        "Languages:", INDIAN_LANGUAGES,
-        index=INDIAN_LANGUAGES.index(st.session_state.chosen_lang))
-    if st.button("Set Language"):
-        st.session_state.chosen_lang = lang_choice
-        st.success(f"Language set to {lang_choice}")
-    st.button("🏠 Back to Home", on_click=go, args=("home",))
+    if submitted or st.session_state.get("submitted"):
+        st.session_state.submitted = True
+        st.header("Results & Explanations")
+        correct_num = 0
+        for idx, q in enumerate(mcqs):
+            st.write(f"**Q{idx+1}: {q['question']}**")
+            st.write(f"- Your answer: **{responses[idx]}**")
+            correct_option = q["options"][ord(q['answer']) - ord('A')]
+            if responses[idx] == correct_option:
+                st.success(f"✅ Correct! Explanation: {q['explanation']}")
+                correct_num +=1
+            else:
+                st.error(f"❌ Incorrect. Correct answer: {correct_option}. Explanation: {q['explanation']}")
+        st.info(f"You got {correct_num}/{len(mcqs)} correct.")
