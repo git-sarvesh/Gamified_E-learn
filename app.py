@@ -3,7 +3,7 @@ import time
 import requests
 import re
 
-GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"  # <-- Insert your Gemini API key
+GEMINI_API_KEY = "AIzaSyBCbRPqIfY4ITwEbeuY_tS8Nw6icnvmd34"
 
 INDIAN_LANGUAGES = [
     "English", "Hindi", "Tamil", "Telugu", "Malayalam", "Kannada", "Bengali",
@@ -18,8 +18,6 @@ if "chosen_lang" not in st.session_state:
 
 def go(page):
     st.session_state.page = page
-
-# ------ HOME PAGE ------
 if st.session_state.page == "home":
     st.title("🏠 XpArena Home")
     st.markdown("Choose what you'd like to do:")
@@ -30,12 +28,8 @@ if st.session_state.page == "home":
     st.write(f"Current language: **{st.session_state.chosen_lang}**")
     st.markdown("---")
     st.info("Welcome to XpArena! Boost your focus, play learning games, or study in any Indian language.")
-
-# ------ POMODORO TIMER ------
 if st.session_state.page == "pomodoro":
     st.markdown("<h1 style='text-align:center;'>⏳ Pomodoro Focus Timer</h1>", unsafe_allow_html=True)
-
-    # Select focus duration
     pomodoro_options = {
         "25 min (Classic)": 25 * 60,
         "50 min (Long)": 50 * 60,
@@ -48,8 +42,6 @@ if st.session_state.page == "pomodoro":
         st.session_state.duration = custom_time * 60
     else:
         st.session_state.duration = pomodoro_options[chosen_pomo]
-
-    # Reset state on page open or reset button
     if 'pomodoro_active' not in st.session_state or st.button("🧹 Reset Timer", use_container_width=True):
         st.session_state.pomodoro_active = False
         st.session_state.start_time = None
@@ -69,8 +61,6 @@ if st.session_state.page == "pomodoro":
             go("home")
 
     st.markdown("---")
-
-    # Countdown and progress bar
     if st.session_state.start_time and st.session_state.pomodoro_active:
         elapsed = int(time.time() - st.session_state.start_time)
         remaining = st.session_state.duration - elapsed
@@ -96,8 +86,6 @@ if st.session_state.page == "pomodoro":
             unsafe_allow_html=True
         )
         st.info("Set your focus time then click Start to begin your Pomodoro session! 🎯")
-
-# ------ LANGUAGE SELECT ------
 if st.session_state.page == "language":
     st.header("🌐 Select Indian Language")
     selected = st.selectbox(
@@ -109,7 +97,6 @@ if st.session_state.page == "language":
         st.session_state.chosen_lang = selected
         st.success(f"Language set to {selected}")
 
-# ------ MCQ QUIZ ------
 if st.session_state.page == "quiz":
     st.header("📝 MCQ Quiz")
     subject = st.selectbox("Subject", ["Mathematics", "Science", "Social Studies", "English", "Hindi", "Computer Science"])
