@@ -138,7 +138,7 @@ if st.session_state.page == "quiz":
 
     if generate or st.session_state.get("mcqs"):
         if generate:
-            with st.spinner("Getting questions from Gemini..."):
+            with st.spinner("Questions Being Generated...."):
                 mcq_text = get_gemini_mcq(GEMINI_API_KEY, subject, language, num_questions)
                 mcqs = parse_mcqs(mcq_text)
                 st.session_state.mcqs = mcqs
