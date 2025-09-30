@@ -10,24 +10,38 @@ INDIAN_LANGUAGES = [
     "Marathi", "Urdu", "Gujarati", "Odia", "Punjabi", "Assamese", "Sanskrit", 
     "Konkani", "Manipuri", "Santali", "Kashmiri", "Dogri", "Maithili", "Bodo"
 ]
+GAME_TYPES = ["MCQ Quiz", "Flashcards", "True/False", "Fill in the Blanks"]
 
 if "page" not in st.session_state:
     st.session_state.page = "home"
 if "chosen_lang" not in st.session_state:
     st.session_state.chosen_lang = "English"
+if "chosen_game" not in st.session_state:
+    st.session_state.chosen_game = GAME_TYPES[0]
 
-def go(page):
-    st.session_state.page = page
+def go(page): st.session_state.page = page
+
+# ------ HOME PAGE ------
 if st.session_state.page == "home":
     st.title("🏠 XpArena Home")
     st.markdown("Choose what you'd like to do:")
     col1, col2, col3 = st.columns(3)
     col1.button("⏳ Pomodoro Timer", on_click=go, args=("pomodoro",))
-    col2.button("📝 MCQ Quiz", on_click=go, args=("quiz",))
+    col2.button("🎮 Learning Games", on_click=go, args=("games_menu",))
     col3.button("🌐 Change Language", on_click=go, args=("language",))
     st.write(f"Current language: **{st.session_state.chosen_lang}**")
     st.markdown("---")
     st.info("Welcome to XpArena! Boost your focus, play learning games, or study in any Indian language.")
+
+# ------ GAME MENU ------
+if st.session_state.page == "games_menu":
+    st.header("🎮 Choose Your Learning Game")
+    st.session_state.chosen_game = st.selectbox("Game Type", GAME_TYPES, key="game_select")
+    if st.button("Start Game"):
+        go("quiz" if st.session_state.chosen_game == "MCQ Quiz" else st.session_state.chosen_game)
+    st.button("🏠 Home", on_click=go, args=("home",))
+
+# ------ POMODORO TIMER ------
 if st.session_state.page == "pomodoro":
     st.markdown("<h1 style='text-align:center;'>⏳ Pomodoro Focus Timer</h1>", unsafe_allow_html=True)
     pomodoro_options = {
@@ -45,7 +59,6 @@ if st.session_state.page == "pomodoro":
     if 'pomodoro_active' not in st.session_state or st.button("🧹 Reset Timer", use_container_width=True):
         st.session_state.pomodoro_active = False
         st.session_state.start_time = None
-
     c1, c2, c3 = st.columns([1,1,1])
     with c1:
         if st.button("▶️ Start", use_container_width=True):
@@ -59,7 +72,6 @@ if st.session_state.page == "pomodoro":
     with c3:
         if st.button("🏠 Home", use_container_width=True):
             go("home")
-
     st.markdown("---")
     if st.session_state.start_time and st.session_state.pomodoro_active:
         elapsed = int(time.time() - st.session_state.start_time)
@@ -74,18 +86,18 @@ if st.session_state.page == "pomodoro":
             remaining = 0
         mins, secs = divmod(max(0, remaining), 60)
         st.markdown(
-            f"<h2 style='text-align:center;font-size:3em;'>{mins:02d}:{secs:02d}</h2>",
-            unsafe_allow_html=True
+            f"<h2 style='text-align:center;font-size:3em;'>{mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True
         )
         st.progress(percent, text=f"{int(percent*100)}% Focus Time Remaining")
         st.markdown(f"<div style='text-align:center;font-size:1.5em;'>{st.session_state.emoji_msg}</div>", unsafe_allow_html=True)
     else:
         mins, secs = divmod(st.session_state.duration, 60)
         st.markdown(
-            f"<h2 style='text-align:center;font-size:3em;'>{mins:02d}:{secs:02d}</h2>",
-            unsafe_allow_html=True
+            f"<h2 style='text-align:center;font-size:3em;'>{mins:02d}:{secs:02d}</h2>", unsafe_allow_html=True
         )
         st.info("Set your focus time then click Start to begin your Pomodoro session! 🎯")
+
+# ------ LANGUAGE SELECT ------
 if st.session_state.page == "language":
     st.header("🌐 Select Indian Language")
     selected = st.selectbox(
@@ -97,17 +109,19 @@ if st.session_state.page == "language":
         st.session_state.chosen_lang = selected
         st.success(f"Language set to {selected}")
 
+# ------ MCQ QUIZ ------
 if st.session_state.page == "quiz":
     st.header("📝 MCQ Quiz")
     subject = st.selectbox("Subject", ["Mathematics", "Science", "Social Studies", "English", "Hindi", "Computer Science"])
     language = st.session_state.chosen_lang
+    curriculum = st.radio("Choose Curriculum", ["CBSE", "State Board"], horizontal=True)
     num_questions = st.slider("Number of Questions", 1, 10, 4)
     generate = st.button("Generate Quiz")
     st.button("🏠 Home", on_click=go, args=("home",))
 
-    def get_gemini_mcq(api_key, subject, language, num_questions=4):
+    def get_gemini_mcq(api_key, subject, language, curriculum, num_questions=4):
         prompt = (
-            f"Generate {num_questions} multiple-choice questions for {subject} as per the {language} CBSE/state board curriculum. "
+            f"Generate {num_questions} multiple-choice questions for {subject} as per the {language} {curriculum} curriculum. "
             "For each question, provide four options A, B, C, D, and the correct answer with a brief explanation. "
             "Format strictly as:\n"
             "Q: [question text]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nAnswer: [A/B/C/D]\nExplanation: [explanation]\n"
@@ -124,8 +138,7 @@ if st.session_state.page == "quiz":
 
     def parse_mcqs(text):
         mcq_pattern = re.compile(
-            r"Q\d*[:.\s-]*(.*?)\nA\)[^\n]+\nB\)[^\n]+\nC\)[^\n]+\nD\)[^\n]+\nAnswer:[\s]*(.)\nExplanation:[\s]*(.*?)\n",
-            re.DOTALL
+            r"Q\d*[:.\s-]*(.*?)\nA\)[^\n]+\nB\)[^\n]+\nC\)[^\n]+\nD\)[^\n]+\nAnswer:[\s]*(.)\nExplanation:[\s]*(.*?)\n", re.DOTALL
         )
         results = []
         for match in mcq_pattern.finditer(text):
@@ -139,7 +152,7 @@ if st.session_state.page == "quiz":
     if generate or st.session_state.get("mcqs"):
         if generate:
             with st.spinner("Questions Being Generated...."):
-                mcq_text = get_gemini_mcq(GEMINI_API_KEY, subject, language, num_questions)
+                mcq_text = get_gemini_mcq(GEMINI_API_KEY, subject, language, curriculum, num_questions)
                 mcqs = parse_mcqs(mcq_text)
                 st.session_state.mcqs = mcqs
                 st.session_state.submitted = False
@@ -169,3 +182,21 @@ if st.session_state.page == "quiz":
                 else:
                     st.error(f"❌ Incorrect. Correct answer: {correct_option}. Explanation: {q['explanation']}")
             st.info(f"You got {correct_num}/{len(mcqs)} correct.")
+
+# ------ FLASHCARDS GAME ------
+if st.session_state.page == "Flashcards":
+    st.header("🃏 Flashcards Game")
+    st.info("This game is under development. More interactive card revision coming soon!")
+    st.button("🏠 Home", on_click=go, args=("home",))
+
+# ------ TRUE/FALSE GAME ------
+if st.session_state.page == "True/False":
+    st.header("✔️ True/False Game")
+    st.info("This game is under development. Next update: real questions and interactive rounds!")
+    st.button("🏠 Home", on_click=go, args=("home",))
+
+# ------ FILL IN THE BLANKS GAME ------
+if st.session_state.page == "Fill in the Blanks":
+    st.header("✏️ Fill in the Blanks Game")
+    st.info("This game is under development. Fill-the-gap activities coming soon!")
+    st.button("🏠 Home", on_click=go, args=("home",))
